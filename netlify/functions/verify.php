@@ -1,7 +1,6 @@
 const imaps = require('imap-simple');
 
 // --- Configuration ---
-// IMPORTANT: For security, use Netlify Environment Variables for these, not hardcoded values.
 const imapConfig = {
     imap: {
         user: 'wahidzaman786987@gmail.com',
@@ -16,7 +15,7 @@ const jazzcashSender = 'JazzCashAlert@jazzcash.com.pk';
 
 
 // This is the main function Netlify will run
-exports.handler = async (event, context) => {
+exports.handler = async (event) => {
     // Only allow POST requests
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Method Not Allowed' };
@@ -37,7 +36,6 @@ exports.handler = async (event, context) => {
         const connection = await imaps.connect(imapConfig);
         await connection.openBox('INBOX');
 
-        // Search for unread emails from the specific sender
         const searchCriteria = ['UNSEEN', ['FROM', jazzcashSender]];
         const fetchOptions = { bodies: ['TEXT'], markSeen: true };
         
@@ -45,19 +43,19 @@ exports.handler = async (event, context) => {
         let paymentFound = false;
 
         for (const item of messages) {
-            const emailBody = item.parts.filter(part => part.which === 'TEXT')[0].body;
+            const part = item.parts.find(part => part.which === 'TEXT');
+            const emailBody = part ? part.body : '';
 
-            // Updated verification logic for the new email format
             const amountString = `of ${amount}PKR`;
             const tidString = `TID: ${tid}`;
 
             if (emailBody.includes(amountString) && emailBody.includes(tidString)) {
                 paymentFound = true;
-                break; // Exit loop once found
+                break;
             }
         }
         
-        connection.end();
+        await connection.end();
 
         if (paymentFound) {
             return {
@@ -72,7 +70,7 @@ exports.handler = async (event, context) => {
         }
 
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Function Error:', error);
         return {
             statusCode: 500,
             body: JSON.stringify({ status: 'error', message: 'An internal server error occurred.' })
